@@ -14,4 +14,7 @@ class Restaurant(BaseModel):
     price_range: str
     reviews: list[Review]
 
+class Result(BaseModel):
+    restaurant: Restaurant
+    score: float
 
