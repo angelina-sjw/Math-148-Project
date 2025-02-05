@@ -1,49 +1,59 @@
 from elasticsearch import Elasticsearch
 from ..data_types import Restaurant, Result
-from typing import Optional, List, Float, String
+from typing import Optional, List
 
 class ESClient: 
-    def __init__(self,uri: str, username: str, password: str):
+    def __init__(self, uri: str, username: str, password: str):
         self.es_client = Elasticsearch(
             uri,
             basic_auth=(username, password)
         )
 
-    def add_restaurant(self, restaurant: Restaurant):
+    def create_index(self, index: str):
+        self.es_client.indices.create(index=index)
+    
+    def delete_index(self, index: str):
+        self.es_client.indices.delete(index=index)
+
+    def index_exists(self, index: str):
+        return self.es_client.indices.exists(index=index)
+    
+    def add_restaurant(self, index: str, restaurant: Restaurant):
         self.es_client.index(
-            index="restaurants",
+            index=index,
             body=restaurant.model_dump(),
         )
 
-    async def add_restaurant_bulk(self, restaurants: List[Restaurant]):
-        await self.es_client.bulk(
-            index="restaurants",
+    def add_restaurant_bulk(self, index: str, restaurants: List[Restaurant]):
+        self.es_client.bulk(
+            index=index,
             body=[restaurant.model_dump() for restaurant in restaurants],
         )
 
-    async def delete_restaurant(self, restaurant_id: String):
-        await self.es_client.delete(index="restaurants", id=restaurant_id)
+    def delete_restaurant(self, index: str, restaurant_id: str):
+        self.es_client.delete(index=index, id=restaurant_id)
 
-    async def delete_restaurant_bulk(self, restaurant_ids: List[String]):
-        await self.es_client.bulk(
-            index="restaurants",
+    def delete_restaurant_bulk(self, index: str, restaurant_ids: List[str]):
+        self.es_client.bulk(
+            index=index,
             body=[{"_id": restaurant_id} for restaurant_id in restaurant_ids],
             delete=True,
         )
 
-    async def get_restaurant_by_id(self, restaurant_id: String) -> Optional[Restaurant]:
-        response = await self.es_client.get(index="restaurants", id=restaurant_id)
+    def get_restaurant_by_id(self, index: str, restaurant_id: str) -> Optional[Restaurant]:
+        response = self.es_client.get(index=index, id=restaurant_id)
         return Restaurant(**response["_source"])
 
-    async def pull_similar_restaurants(self, embedding: list[Float], k: int = 10) -> List[Result]:
-        response = await self.es_client.search(
-            index="restaurants",
+    def pull_similar_restaurants(self, index: str, type: str, embedding: List[float], k: int = 10) -> List[Result]:
+        embedding_field = 'text_embedding' if type == 'text' else 'photo_embedding'
+        response = self.es_client.search(
+            index=index,
             body={
                 "query": {
                     "script_score": {
                         "query": {"match_all": {}},
                         "script": {
-                            "source": "cosineSimilarity(params.query_vector, 'embedding') + 1.0",
+                            "source": f"cosineSimilarity(params.query_vector, '{embedding_field}') + 1.0",
                             "params": {"query_vector": embedding}
                         }
                     }
