@@ -2,10 +2,12 @@ from openai import OpenAI
 from typing import Union, List
 import base64
 from ..data_types import schema1
+import requests
 
 class LLMClient:
-    def __init__(self, openai_api_key: str):
+    def __init__(self, openai_api_key: str, clip_server_url: str):
         self.openai_client = OpenAI(api_key=openai_api_key)
+        self.clip_server_url = clip_server_url
 
     async def extract_keywords(self, query: str) -> str:
         response = await self.openai_client.chat.completions.create(
@@ -17,24 +19,25 @@ class LLMClient:
         return response.choices[0].message.content
 
     async def get_embedding(self, input_data: Union[str, bytes], input_type: str) -> List[float]:
+        try:
+            if input_type == "text":
+                response = requests.post(
+                    f"{self.clip_server_url}/embed/text",
+                    json={"text": input_data}
+                )
+            elif input_type == "image":
+                files = {"image": input_data}
+                response = requests.post(
+                    f"{self.clip_server_url}/embed/image",
+                    files=files
+                )
+            else:
+                raise ValueError("input_type must be either 'text' or 'image'")
 
-        if input_type == "text":
-            response = await self.openai_client.embeddings.create(
-                model="clip",
-                input=input_data,
-                encoding_format="float"
-            )
-            return response.data[0].embedding
-        
-        elif input_type == "image":
-            base64_image = base64.b64encode(input_data).decode('utf-8')
-            response = await self.openai_client.embeddings.create(
-                model="clip",
-                input=base64_image,
-                encoding_format="float"
-            )
-            return response.data[0].embedding
-        
-        else:
-            raise ValueError("input_type must be either 'text' or 'image'")
+            if response.status_code == 200:
+                return response.json()["embedding"]
+            else:
+                raise Exception(f"Error from CLIP server: {response.text}")
+        except Exception as e:
+            raise Exception(f"Failed to get embedding: {str(e)}")
 
