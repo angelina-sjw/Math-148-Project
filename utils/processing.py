@@ -26,7 +26,7 @@ def expand_dict_col(df, column_name, expected_keys):
 
     Returns: DataFrame with newly added columns.
     """
-    expanded_df = pd.json_normalize(df[column_name].apply(parsing))
+    expanded_df = pd.json_normalize(df[column_name].apply(parse_dict_col))
     expanded_df = expanded_df.reindex(columns=expected_keys, fill_value=False)
 
     # convert boolean values to integers
