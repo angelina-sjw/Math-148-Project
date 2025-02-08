@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 def _generate_restaurant_profile(restaurant: Restaurant) -> Dict:
+    #TODO: change the profile generation to one sentence description because CLIP only supports 75 tokens
     price_descriptions = {
         "1": "budget-friendly",
         "2": "moderately priced",
@@ -47,8 +48,8 @@ def _generate_restaurant_profile(restaurant: Restaurant) -> Dict:
     return profile.strip()
 
 
-async def intialize_yelp_index(data_dir: str, openai_api_key: str, es_uri: str, es_username: str, es_password: str, es_index_name: str = "yelp_index", batch_size: int = 1000):
-    llm_client = LLMClient(openai_api_key)
+async def intialize_yelp_index(data_dir: str, openai_api_key: str, clip_server_url: str, es_uri: str, es_username: str, es_password: str, es_index_name: str = "yelp_index", batch_size: int = 1000):
+    llm_client = LLMClient(openai_api_key, clip_server_url)
     es_client = ESClient(es_uri, es_username, es_password)
     es_client.create_index(es_index_name) if not es_client.index_exists(es_index_name) else None
     photos = {}
@@ -91,7 +92,7 @@ async def intialize_yelp_index(data_dir: str, openai_api_key: str, es_uri: str, 
                         logger.info(f"Generating text embedding for {restaurant.name}")
                         text_embedding = await llm_client.get_embedding(profile_text, "text")
                         logger.info(f"Generating photo embedding for {restaurant.name}")
-                        with open(f"data/photos/{photo_profile['photo_id']}.jpg", "rb") as img_file:
+                        with open(f"{data_dir}/photos/{photo_profile['photo_id']}.jpg", "rb") as img_file:
                             photo_data = img_file.read()
                         photo_embedding = await llm_client.get_embedding(photo_data, "image")
                         logger.info(f"Generated embeddings for {restaurant.name}")
@@ -113,4 +114,7 @@ async def intialize_yelp_index(data_dir: str, openai_api_key: str, es_uri: str, 
         return False
 
     
-    
+async def clear_yelp_index(es_uri: str, es_username: str, es_password: str, es_index_name: str):
+    es_client = ESClient(es_uri, es_username, es_password)
+    es_client.delete_index(es_index_name)
+    es_client.create_index(es_index_name)

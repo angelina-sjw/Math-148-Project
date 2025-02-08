@@ -3,6 +3,9 @@ from typing import Union, List
 import base64
 from ..data_types import schema1
 import requests
+import logging
+
+logger = logging.getLogger(__name__)
 
 class LLMClient:
     def __init__(self, openai_api_key: str, clip_server_url: str):
@@ -26,10 +29,10 @@ class LLMClient:
                     json={"text": input_data}
                 )
             elif input_type == "image":
-                files = {"image": input_data}
+                base64_data = base64.b64encode(input_data).decode('utf-8')
                 response = requests.post(
                     f"{self.clip_server_url}/embed/image",
-                    files=files
+                    json={"image_data": base64_data}
                 )
             else:
                 raise ValueError("input_type must be either 'text' or 'image'")
@@ -37,7 +40,9 @@ class LLMClient:
             if response.status_code == 200:
                 return response.json()["embedding"]
             else:
+                logger.error(f"Server error: {response.text}")
                 raise Exception(f"Error from CLIP server: {response.text}")
         except Exception as e:
+            logger.error(f"Embedding error: {str(e)}")
             raise Exception(f"Failed to get embedding: {str(e)}")
 
