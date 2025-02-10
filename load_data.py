@@ -3,6 +3,9 @@ import pandas as pd
 import json
 import sqlite3
 
+from utils.processing import process_parking_ambience_categories
+from utils.zipcode import merge_income_data
+
 # file paths
 data_folder = "yelp_dataset"
 review_file = os.path.join(data_folder, 'yelp_academic_dataset_review.json')
@@ -130,10 +133,46 @@ LEFT JOIN business b ON r.business_id = b.business_id
 LEFT JOIN user u ON r.user_id = u.user_id
 """
 
-# execute query and save to CSV
 df_merged = pd.read_sql_query(query, conn)
-df_merged.to_csv(os.path.join(data_folder, 'yelp_merged_data.csv'), index=False)
 
-print("Merged dataset saved as yelp_merged_data.csv")
+# process dataframe after SQL query
+df_merged = process_parking_ambience_categories(df_merged)
+df_merged = merge_income_data(df_merged)
 
-conn.close() # close connection
+# filter businesses by minimum review count
+business_review_counts = df_merged.groupby("business_id")["user_id"].count()
+min_reviews_threshold = 10
+valid_businesses = business_review_counts[business_review_counts >= min_reviews_threshold].index
+
+df_filtered_businesses = df_merged[df_merged["business_id"].isin(valid_businesses)].copy()
+
+# convert 'useful' to numeric and filter rows with 'useful' > 0
+df_filtered_businesses["useful"] = pd.to_numeric(df_filtered_businesses["useful"], errors='coerce')
+df_filtered = df_filtered_businesses[df_filtered_businesses["useful"] > 0].copy()
+
+df_filtered.dropna(subset=['useful', 'business_id'], inplace=True)
+
+df_filtered['p40'] = df_filtered.groupby('business_id')['useful'].transform(lambda x: x.quantile(0.40))
+df_filtered['p60'] = df_filtered.groupby('business_id')['useful'].transform(lambda x: x.quantile(0.60))
+
+# define classification function
+def classify_useful(row):
+    if row['useful'] < row['p40']:
+        return "less useful"
+    elif row['useful'] > row['p60']:
+        return "more useful"
+    else:
+        return "average"
+
+df_filtered['useful_category'] = df_filtered.apply(classify_useful, axis=1)
+# drop the 'average' category to keep only two classes
+df_filtered = df_filtered[df_filtered['useful_category'] != 'average']
+
+# drop the temporary percentile columns
+df_filtered.drop(['p40', 'p60'], axis=1, inplace=True)
+
+output_file = os.path.join(data_folder, 'yelp_merged_data_filtered.csv')
+df_filtered.to_csv(output_file, index=False)
+print(f"Merged dataset saved as {output_file}")
+
+conn.close()
