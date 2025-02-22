@@ -1,56 +1,59 @@
 import ast
 import pandas as pd
+from typing import Any, List
 
-def parse_dict_col(column):
+
+def parse_dict_col(column: Any) -> dict:
     """
-    converts string to dictionary
-
-    Returns: parsed dict or an empty dict if parsing fails.
+    Convert a string representation of a dictionary into an actual dict.
+    
+    If the input is already a dict, it is returned unchanged. Otherwise, the function
+    attempts to parse the string using ast.literal_eval after stripping surrounding quotes.
+    In case of failure, an empty dict is returned.
     """
     if isinstance(column, dict):
-        return column  # Already a dictionary, return as is
+        return column
 
     try:
-        parsed_dict = ast.literal_eval(column.strip('"'))  # remove extra quotes and parse
-        if isinstance(parsed_dict, dict):
-            return parsed_dict
-        else:
-            return {}
-    except (ValueError, SyntaxError) as e:
-        return {}  # Return empty dictionary on error
+        # Remove extra quotes and attempt to evaluate the string as a dict
+        parsed_dict = ast.literal_eval(column.strip('"'))
+        return parsed_dict if isinstance(parsed_dict, dict) else {}
+    except (ValueError, SyntaxError):
+        return {}
 
 
-def expand_dict_col(df, column_name, expected_keys):
+def expand_dict_col(df: pd.DataFrame, column_name: str, expected_keys: List[str]) -> pd.DataFrame:
     """
-    expands a dictionary-like column into separate boolean(0/1) columns.
-
-    Returns: DataFrame with newly added columns.
+    Expand a dictionary-like column into separate boolean (0/1) columns.
+    
+    Each key specified in expected_keys will be created as a new column in the DataFrame.
+    Missing keys and NaN values are filled with False, and all values are converted to int.
     """
-    expanded_df = pd.json_normalize(df[column_name].apply(parse_dict_col))
+    # Apply parsing to each cell in the column
+    parsed_series = df[column_name].apply(parse_dict_col)
+    # Normalize the parsed dictionaries into a DataFrame
+    expanded_df = pd.json_normalize(parsed_series)
+    # Ensure all expected keys are present; fill missing keys with False
     expanded_df = expanded_df.reindex(columns=expected_keys, fill_value=False)
-
-    # convert boolean values to integers
     expanded_df = expanded_df.fillna(False).astype(int)
-    df = df.join(expanded_df)
+    # Join the new columns with the original DataFrame
+    return df.join(expanded_df)
 
-    return df
 
-def process_parking_ambience_categories(df):
-  """
-  expands "BusinessParking" and "Ambience" columns into separate boolean(0/1) columns.
-  drop "categories" colmn
+def process_parking_ambience_categories(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Process and expand the "BusinessParking" and "Ambience" columns into separate boolean columns.
+    
+    The function creates new columns for parking (e.g., 'garage', 'street') and ambience
+    (e.g., 'touristy', 'hipster') features, then drops the original "categories" column.
+    """
+    # Define expected keys for parking and ambience attributes
+    parking_cols = ["garage", "street", "validated", "lot", "valet"]
+    ambience_cols = ["touristy", "hipster", "romantic", "divey", "intimate", "trendy", "upscale", "classy", "casual"]
 
-  Returns: processed DataFrame.
-  """
-  parking_cols = ["garage", "street", "validated", "lot", "valet"]
-  df = expand_dict_col(df, "BusinessParking", parking_cols)
-  ambience_cols = ["touristy", "hipster", "romantic", "divey", "intimate", "trendy", "upscale", "classy", "casual"]
-  df = expand_dict_col(df, "Ambience", ambience_cols)
-  df = df.drop(columns=["categories"])
-  return df
-
-# Usage Example 
-# file_path = "yelp_sampled_data.csv"
-# df = pd.read_csv(file_path)
-# df = process_parking_ambience_categories(df)
-# df.to_csv("processed_yelp_data.csv", index=False)
+    # Expand the dictionary columns into separate boolean columns
+    df = expand_dict_col(df, "BusinessParking", parking_cols)
+    df = expand_dict_col(df, "Ambience", ambience_cols)
+    
+    # Drop the original 'categories' column as it's no longer needed
+    return df.drop(columns=["categories"])
