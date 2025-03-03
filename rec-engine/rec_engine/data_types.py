@@ -31,12 +31,11 @@ class Restaurant(BaseModel):
     photo_ids: list[str]
     captions: list[str]
     labels: list[str]
-    # These are properly annotated with Optional
     text_embeddings: Optional[List[List[float]]] = None
     photo_embeddings: Optional[List[List[float]]] = None
     
     model_config = {
-        "extra": "allow"  # Allow extra fields not defined in the model
+        "extra": "allow"
     }
 
 class Result(BaseModel):
@@ -47,17 +46,27 @@ class Result(BaseModel):
 schema1 = {
     "name": "get_keywords",
     "description": "Interpret predefined keywords from a user's query",
-    "strict": True,
-    "parameters": {
+    "schema": {
         "type": "object",
         "properties": {
             "cuisine": {
                 "type": "string",
                 "description": "The cuisine that user is looking for",
-                "enum": ["Italian", "Chinese", "Mexican", "Indian", "Japanese"] 
-            }
-            # TODO: add more keywords
+                "enum": ["American", "Italian", "Chinese", "Mexican", "Indian", "Japanese", "Korean", "Thai", "Vietnamese", "French", "German", "Spanish", "Mediterranean", "Greek", "Turkish", "Brazilian"] 
+            },
+            "price_range": {
+                "type": "string",
+                "description": "The price range the user is looking for (1-4, where 1 is least expensive, 4 is most expensive)",
+                "enum": ["1", "2", "3", "4"]
+            },
+            "rating": {
+                "type": "number",
+                "description": "The minimum rating (1-5 stars) the user is looking for",
+                "enum": [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5]
+            },
         },
-        "required": ["cuisine"]
-    }
+        "additionalProperties": False,
+        "required": ["cuisine", "price_range", "rating"]
+    },
+    "strict": True
 }

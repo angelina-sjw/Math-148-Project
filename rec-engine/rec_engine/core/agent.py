@@ -4,7 +4,7 @@ import base64
 from ..data_types import schema1
 import requests
 import logging
-
+import json
 logger = logging.getLogger(__name__)
 
 class LLMClient:
@@ -12,14 +12,15 @@ class LLMClient:
         self.openai_client = OpenAI(api_key=openai_api_key)
         self.clip_server_url = clip_server_url
 
-    async def extract_keywords(self, query: str) -> str:
-        response = await self.openai_client.chat.completions.create(
-            model="gpt-4o-mini-2024-07-18",
+    def extract_keywords(self, query: str) -> str:
+        response = self.openai_client.chat.completions.create(
+            model="gpt-4o-2024-08-06",
             messages=[{"role": "system", "content": "You are a helpful assistant that extracts keywords from a user's query."}, {"role": "user", "content": query}],
-            max_tokens=100,
-            response_format=schema1
+            response_format={"type": "json_schema",
+                             "json_schema": schema1}
         )
-        return response.choices[0].message.content
+        res = json.loads(response.choices[0].message.content)
+        return res
 
     async def get_embedding(self, input_data: Union[str, bytes], input_type: str) -> List[float]:
         try:

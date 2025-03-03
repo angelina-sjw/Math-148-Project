@@ -1,7 +1,7 @@
 from elasticsearch import Elasticsearch
 from rec_engine.core.agent import LLMClient
 from rec_engine.data_types import Restaurant, Result
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 import logging
 import os
 
@@ -106,10 +106,9 @@ class ESClient:
         if bulk_data:
             response = self.es_client.bulk(
                 body=bulk_data,
-                refresh=True  # Force refresh
+                refresh=True
             )
             
-            # Check for errors
             if response.get('errors', False):
                 error_items = [item for item in response['items'] if 'error' in item['index']]
                 logging.error(f"Bulk indexing had {len(error_items)} errors: {error_items[:3]}")
@@ -147,39 +146,53 @@ class ESClient:
         if llm_client is None:
             raise ValueError("LLMClient is required for generating embeddings")
         
-        # Check if the index exists
         if not self.index_exists(index):
             logging.error(f"Index {index} does not exist!")
             return []
         
-        # Determine if query is a file path or text
+        is_image_path = query.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp'))
         is_file_path = os.path.exists(query) and os.path.isfile(query)
         
-        logging.info(f"Processing {'image' if is_file_path else 'text'} query: {query}")
         
-        if is_file_path:
-            # It's a file path, process as an image
-            with open(query, "rb") as img_file:
-                image_data = img_file.read()
-            embedding = await llm_client.get_embedding(image_data, "image")
-            query_type = "photo"
+        if is_image_path and not is_file_path:
+            error_msg = f"Image file not found: {query}"
+            logging.error(error_msg)
+            raise FileNotFoundError(error_msg)
+        
+        is_image_query = is_image_path and is_file_path
+        
+        logging.info(f"Processing {'image' if is_image_query else 'text'} query: {query}")
+        
+        if is_image_query:
+            try:
+                with open(query, "rb") as img_file:
+                    image_data = img_file.read()
+                embedding = await llm_client.get_embedding(image_data, "image")
+                query_type = "photo"
+            except Exception as e:
+                error_msg = f"Error processing image file: {e}"
+                logging.error(error_msg)
+                raise RuntimeError(error_msg)
         else:
             # It's a text query
             embedding = await llm_client.get_embedding(query, "text")
             query_type = "text"
         
         logging.info(f"Generated embedding with {len(embedding)} dimensions")
+        logging.info(f"Using query type: {query_type}")
         
         # Search using the generated embedding
-        results = self.pull_similar_restaurants(index, query_type, embedding, k)
+        results = self.pull_similar_restaurants(index, query_type, embedding, k, keywords)
         logging.info(f"Found {len(results)} results")
         
         return results
 
-    def pull_similar_restaurants(self, index: str, type: str, embedding: List[float], k: int = 10) -> List[Result]:
+    def pull_similar_restaurants(self, index: str, type: str, embedding: List[float], k: int = 10, keywords: Dict[str, Any] = None) -> List[Result]:
         embedding_field_prefix = 'text_embedding_' if type == 'text' else 'photo_embedding_'
         
-        logger.info(f"Searching for {type} embeddings with prefix: {embedding_field_prefix}")
+        print(f"Searching for {type} embeddings with prefix: {embedding_field_prefix}")
+        if keywords:
+            print(f"Filtering with keywords: {keywords}")
         
         # This script will find the maximum similarity across all embeddings of the specified type
         script_source = f"""
@@ -201,25 +214,73 @@ class ESClient:
         return found_embedding ? max_score : 0;
         """
         
+        if keywords and isinstance(keywords, dict):
+            query = {
+                "bool": {
+                    "must": [
+                        {
+                            "script_score": {
+                                "query": {"match_all": {}},
+                                "script": {
+                                    "source": script_source,
+                                    "params": {"query_vector": embedding}
+                                }
+                            }
+                        }
+                    ],
+                    "filter": []
+                }
+            }
+            
+            if "cuisine" in keywords:
+                cuisine_filter = {
+                    "match": {
+                        "cuisine": keywords["cuisine"]
+                    }
+                }
+                query["bool"]["filter"].append(cuisine_filter)
+                
+            if "price_range" in keywords:
+                # For price range (assuming it's stored as a string or number)
+                price_filter = {
+                    "term": {
+                        "price_range": keywords["price_range"]
+                    }
+                }
+                query["bool"]["filter"].append(price_filter)
+                
+            if "rating" in keywords:
+                # For rating, use a range query to find restaurants with at least the specified rating
+                rating_filter = {
+                    "range": {
+                        "rating": {
+                            "gte": keywords["rating"]
+                        }
+                    }
+                }
+                query["bool"]["filter"].append(rating_filter)
+        else:
+            query = {
+                "script_score": {
+                    "query": {"match_all": {}},
+                    "script": {
+                        "source": script_source,
+                        "params": {"query_vector": embedding}
+                    }
+                }
+            }
+        
         try:
-            logger.info(f"Executing Elasticsearch query with {len(embedding)} dimensional vector")
+            print(f"Executing Elasticsearch query with {len(embedding)} dimensional vector")
             response = self.es_client.search(
                 index=index,
                 body={
-                    "query": {
-                        "script_score": {
-                            "query": {"match_all": {}},
-                            "script": {
-                                "source": script_source,
-                                "params": {"query_vector": embedding}
-                            }
-                        }
-                    },
+                    "query": query,
                     "size": k
                 }
             )
             
-            logger.info(f"Elasticsearch response received with {len(response['hits']['hits'])} hits")
+            print(f"Elasticsearch response received with {len(response['hits']['hits'])} hits")
             
             # Filter out results with zero score (no matching embeddings)
             results = [
@@ -231,11 +292,11 @@ class ESClient:
                 if hit["_score"] > 0
             ]
             
-            logger.info(f"After filtering, {len(results)} results remain")
+            print(f"After filtering, {len(results)} results remain")
             return results
             
         except Exception as e:
-            logger.error(f"Error in Elasticsearch query: {str(e)}")
+            print(f"Error in Elasticsearch query: {str(e)}")
             import traceback
             traceback.print_exc()
             return []

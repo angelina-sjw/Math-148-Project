@@ -37,12 +37,14 @@ async def main():
             
         print(f"Connected to Elasticsearch, index '{args.es_index_name}' exists")
         
-        is_image_query = os.path.exists(query) and os.path.isfile(query)
+        is_image_path = query.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp'))
+        is_image_query = is_image_path and os.path.exists(query) and os.path.isfile(query)
+        
         print(f"Query type: {'image' if is_image_query else 'text'}")
         
         if args.advanced_mode and not is_image_query:
             print("Using advanced mode with keyword extraction")
-            keywords = await llm_client.extract_keywords(query)
+            keywords = llm_client.extract_keywords(query)
             print(f"Extracted keywords: {keywords}")
             results = await es_client.search_restaurants(args.es_index_name, query, args.k, llm_client, keywords)
         else:
