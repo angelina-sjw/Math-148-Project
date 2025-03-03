@@ -251,7 +251,7 @@ def reduce_dimensions(input_csv: str, output_csv: str, chunksize: int = 50000) -
     # Columns to retain in the final output.
     keep_cols = [
         "user_id", "business_id", "text", "stars", "useful", "cool", "useful_category",
-        "user_review_count", "user_useful", "user_funny", "user_cool",
+        "user_review_count", "user_useful",  # Removed user_funny and user_cool from here
         "average_stars", "fans",
         "compliment_hot", "compliment_more", "compliment_profile",
         "compliment_cute", "compliment_list", "compliment_note",
@@ -272,7 +272,6 @@ def reduce_dimensions(input_csv: str, output_csv: str, chunksize: int = 50000) -
     ]
     parking_cols = ["garage", "street", "validated", "lot", "valet"]
     ambience_cols = ["touristy", "hipster", "romantic", "divey", "intimate", "trendy", "upscale", "classy", "casual"]
-    user_vote_cols = ["user_useful", "user_funny", "user_cool"]
 
     def map_price(x: Optional[str]) -> Optional[str]:
         """
@@ -304,9 +303,12 @@ def reduce_dimensions(input_csv: str, output_csv: str, chunksize: int = 50000) -
         available_cols = [col for col in keep_cols if col in chunk.columns]
         chunk = chunk[available_cols]
         
-        # Create new features by summing existing columns.
-        valid_votes = [col for col in user_vote_cols if col in chunk.columns]
-        chunk["user_total_votes"] = chunk[valid_votes].sum(axis=1, numeric_only=True) if valid_votes else 0
+        # Calculate user_total_votes using only user_useful
+        if "user_useful" in chunk.columns:
+            # Use only user_useful and subtract the review's useful votes.
+            chunk["user_total_votes"] = chunk["user_useful"] - chunk["useful"]
+        else:
+            chunk["user_total_votes"] = 0
         
         valid_comps = [col for col in compliment_cols if col in chunk.columns]
         chunk["user_total_compliments"] = chunk[valid_comps].sum(axis=1, numeric_only=True) if valid_comps else 0
@@ -337,7 +339,7 @@ def reduce_dimensions(input_csv: str, output_csv: str, chunksize: int = 50000) -
             chunk["attire_binary"] = chunk["RestaurantsAttire"].apply(map_attire)
 
         # Drop original columns that have been merged into new features.
-        drop_cols = valid_votes + valid_comps + valid_parking + valid_ambience
+        drop_cols = []
         if has_median:
             drop_cols.append("Families Median Income (Dollars)")
         if has_mean:
