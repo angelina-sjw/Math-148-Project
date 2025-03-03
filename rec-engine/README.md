@@ -47,6 +47,18 @@ poetry install
 cd clip-server
 poetry install
 ```
+4. Add Yelp dataset
+
+```bash
+cd rec_engine
+mkdir data
+```
+Place following folders/files in the data folder:
+- photos/
+- photos.json
+- yelp_academic_dataset_business.json
+
+Note: photos/ is the folder containing jpg business photos from the origin yelp dataset files.
 
 ### Configuration
 
