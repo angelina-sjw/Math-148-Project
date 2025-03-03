@@ -34,17 +34,17 @@ def _get_image_caption_pairs(photos_dataset_dir: str) -> List[Tuple[str, str]]:
     return image_caption_pairs
 
 class YelpImageTextDataset(Dataset):
-    def __init__(self, photos_dataset_dir: str, transform=None):
-        self.photos_dir = photos_dataset_dir
+    def __init__(self, photo_dataset_dir: str, transform=None):
+        self.photo_dataset_dir = photo_dataset_dir
         self.transform = transform
-        self.image_caption_pairs = _get_image_caption_pairs(photos_dataset_dir)
+        self.image_caption_pairs = _get_image_caption_pairs(photo_dataset_dir)
         
     def __len__(self):
         return len(self.image_caption_pairs)
     
     def __getitem__(self, idx):
         photo_id, caption = self.image_caption_pairs[idx]
-        image_path = os.path.join(self.photos_dir, f"{photo_id}.jpg")
+        image_path = os.path.join(f"{self.photo_dataset_dir}/photos/", f"{photo_id}.jpg")
         
         try:
             image = Image.open(image_path).convert('RGB')
@@ -88,7 +88,6 @@ def train_clip(
                 
             images = images.to(device)
             
-            # Get image and text features
             image_features = model.encode_image(images)
             text_features = model.encode_text(texts)
             
@@ -96,21 +95,17 @@ def train_clip(
             image_features = image_features / image_features.norm(dim=-1, keepdim=True)
             text_features = text_features / text_features.norm(dim=-1, keepdim=True)
 
-            # Cosine similarity as logits
             logit_scale = model.logit_scale.exp()
             logits_per_image = logit_scale * image_features @ text_features.t()
             logits_per_text = logits_per_image.t()
-
-            # Symmetric loss
             labels = torch.arange(len(images), device=device)
             loss_i = torch.nn.functional.cross_entropy(logits_per_image, labels)
             loss_t = torch.nn.functional.cross_entropy(logits_per_text, labels)
             loss = (loss_i + loss_t) / 2
 
-            # Backward pass
             optimizer.zero_grad()
             loss.backward()
-            optimizer.step()
+            optimizer.step() # applies previous gradients to the model parameters to minimize loss
 
             total_loss += loss.item()
             progress_bar.set_postfix({"Loss": total_loss / (batch_idx + 1)})
