@@ -25,6 +25,7 @@ The system consists of three main components:
 - Elasticsearch (local or remote instance)
 - OpenAI API key
 - CUDA-compatible GPU (recommended for CLIP model server)
+- Docker (required for Elasticsearch)
 
 ### Installation
 
@@ -59,6 +60,13 @@ Place following folders/files in the data folder:
 - yelp_academic_dataset_business.json
 
 Note: photos/ is the folder containing jpg business photos from the origin yelp dataset files.
+
+5. Create Elasticsearch index using docker:
+
+```bash
+cd docker
+docker-compose up -d
+```
 
 ### Configuration
 
