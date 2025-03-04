@@ -1,13 +1,23 @@
 import os
-from tqdm import tqdm
+
 import pandas as pd
-from PIL import Image
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
+from PIL import Image
+from tqdm import tqdm
+
 import torchvision.transforms as transforms
 
 
 def resize_images(input_dir, output_dir, target_size=(224, 224)):
+    """
+    Resizes all images in the input directory and saves them in the output directory.
+
+    Args:
+        input_dir (str): Path to the directory containing input images.
+        output_dir (str): Path to save the resized images.
+        target_size (tuple): Desired output size for images (default is 224x224).
+    """
     if not os.path.exists(input_dir):
         raise FileNotFoundError(f"Input directory does not exist: {input_dir}")
     
@@ -39,6 +49,16 @@ def resize_images(input_dir, output_dir, target_size=(224, 224)):
 
 
 def keep_existing_photos(df, dir):
+    """
+    Filters out missing images from the dataset.
+
+    Args:
+        df (DataFrame): DataFrame containing image metadata.
+        dir (str): Directory where images are stored.
+
+    Returns:
+        DataFrame: A cleaned version of df containing only images that exist in the directory.
+    """
     missing_images = []
     valid_indices = []
     for idx, row in tqdm(df.iterrows(), total=len(df), desc="Checking images"):
@@ -58,6 +78,16 @@ def keep_existing_photos(df, dir):
 
 
 def visualize_images(df, image_dir, label, label_value, num_samples=5):
+    """
+    Displays a sample of images from the dataset based on a specified label.
+
+    Args:
+        df (DataFrame): DataFrame containing image metadata.
+        image_dir (str): Directory where images are stored.
+        label (str): Column name for labels in df.
+        label_value (any): Specific label value to filter images.
+        num_samples (int): Number of images to display.
+    """
     df = df[df[f'{label}'] == label_value]
 
     if df.empty:
@@ -87,11 +117,19 @@ def visualize_images(df, image_dir, label, label_value, num_samples=5):
 
 
 def downsample_group(group, target_size):
-    # Get the distribution of labels within this group
-    label_counts = group['label'].value_counts(normalize=True)  # Get percentage representation
-    sample_counts = (label_counts * target_size).astype(int)  # Calculate number of samples per label
+    """
+    Performs stratified downsampling of a group based on label distribution.
 
-    # Perform stratified sampling based on calculated sample counts
+    Args:
+        group (DataFrame): A group of data with label distributions.
+        target_size (int): Desired number of samples after downsampling.
+
+    Returns:
+        DataFrame: A downsampled version of the group while maintaining label distribution.
+    """
+    label_counts = group['label'].value_counts(normalize=True)  
+    sample_counts = (label_counts * target_size).astype(int)
+
     sampled_group = pd.concat([
         group[group['label'] == label].sample(n=min(count, len(group[group['label'] == label])), random_state=42)
         for label, count in sample_counts.items()
@@ -99,7 +137,17 @@ def downsample_group(group, target_size):
 
     return sampled_group
 
+
 def preprocess_image(image_path):
+    """
+    Preprocesses an image for model input by resizing, normalizing, and converting to a tensor.
+
+    Args:
+        image_path (str): Path to the image file.
+
+    Returns:
+        tuple: (Original image, preprocessed image tensor)
+    """
     transform = transforms.Compose([
         transforms.Resize((224, 224)),
         transforms.ToTensor(),
@@ -110,3 +158,21 @@ def preprocess_image(image_path):
     input_tensor = transform(image).unsqueeze(0)
     
     return image, input_tensor
+
+
+def show_images(samples, title):
+    """
+    Displays a set of images with their confidence scores.
+
+    Args:
+        samples (list): A list of tuples (confidence, image tensor).
+        title (str): Title of the visualization.
+    """
+    fig, axes = plt.subplots(1, len(samples), figsize=(15, 5))
+    for ax, (conf, img) in zip(axes, samples):
+        img = img.cpu().numpy().transpose(1, 2, 0)
+        ax.imshow(img)
+        ax.set_title(f"Conf: {conf:.4f}")
+        ax.axis("off")
+    plt.suptitle(title)
+    plt.show()

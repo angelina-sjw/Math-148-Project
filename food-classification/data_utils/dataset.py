@@ -1,17 +1,16 @@
-from PIL import Image
-
 import torch
 from torch.utils.data import Dataset, Subset
+
 import torchvision.transforms as transforms
 from torchvision.transforms import RandAugment
-from transformers import BertTokenizer
 
+from PIL import Image
+from transformers import BertTokenizer
 from sklearn.model_selection import train_test_split
 
 
-
-
 class PhotoLabelDataset(Dataset):
+    """Dataset for loading images and their corresponding labels from a dataframe."""
     def __init__(self, df, dir, label, transform=None):
         self.df = df
         self.dir = dir
@@ -22,6 +21,7 @@ class PhotoLabelDataset(Dataset):
         return len(self.df)
 
     def __getitem__(self, idx):
+        """Retrieves an image and its label based on the index."""
         if isinstance(idx, slice):
             return PhotoLabelDataset(self.df[idx], self.dir, self.label, transform=self.transform)
 
@@ -40,6 +40,7 @@ class PhotoLabelDataset(Dataset):
         return img, label
     
     def _load_image(self, photo_id):
+        """Loads an image from the given directory and applies transformations."""
         img_path = f"{self.dir}/{photo_id}.jpg"
         img = Image.open(img_path).convert("RGB")
         img = self.transform(img)
@@ -47,6 +48,7 @@ class PhotoLabelDataset(Dataset):
     
 
 class MultimodalDataset(Dataset):
+    """Dataset for handling both image and text data, used for multimodal learning."""
     def __init__(self, df, dir, label, tokenizer=None, transform=None):
         self.df = df
         self.dir = dir
@@ -100,6 +102,19 @@ class MultimodalDataset(Dataset):
 
 
 def stratified_split_dataset(dataset, labels, train_size, val_size, random_state=None):
+    """
+    Splits a dataset into training, validation, and test sets using stratified sampling.
+    
+    Args:
+        dataset: The dataset to be split.
+        labels: Labels for stratified sampling.
+        train_size: Proportion of data for training.
+        val_size: Proportion of data for validation.
+        random_state: Random seed for reproducibility.
+
+    Returns:
+        Three subsets: train, validation, and test datasets.
+    """
     test_size = 1.0 - train_size - val_size
     
     train_idx, temp_idx = train_test_split(
@@ -122,6 +137,7 @@ def stratified_split_dataset(dataset, labels, train_size, val_size, random_state
     return Subset(dataset, train_idx), Subset(dataset, val_idx), Subset(dataset, test_idx)
 
 
+# Data augmentation and preprocessing transformations
 train_transform = transforms.Compose([
     transforms.RandomHorizontalFlip(p=0.5),  # Flip images randomly
     transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1),  # Color distortion

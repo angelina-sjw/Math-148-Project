@@ -1,11 +1,21 @@
 import torch
 import torch.nn as nn
 from torchvision import models
-from transformers import BertModel, BertTokenizer
+from transformers import BertModel
 
 
-# Image feature extractor
+# Image feature extractor using pretrained ResNet18
 class ResNetFeatureExtractor(nn.Module):
+    """
+    Extracts image features using a pre-trained ResNet18 model.
+
+    Args:
+        output_dim (int): Dimension of the extracted feature vector.
+        explain_model (bool): If True, allows gradients for feature extraction.
+
+    Returns:
+        A tensor of shape [batch_size, output_dim] containing image embeddings.
+    """
     def __init__(self, output_dim=512, explain_model=False):
         super().__init__()
         self.explain_model = explain_model
@@ -26,8 +36,18 @@ class ResNetFeatureExtractor(nn.Module):
         return self.fc(x)
 
 
-# Text feature extractor
+# Text feature extractor using pretrained BERT
 class BertFeatureExtractor(nn.Module):
+    """
+    Extracts text features using a pre-trained BERT model.
+
+    Args:
+        output_dim (int): Dimension of the extracted feature vector.
+        explain_model (bool): If True, allows gradients for feature extraction.
+
+    Returns:
+        A tensor of shape [batch_size, output_dim] containing text embeddings.
+    """
     def __init__(self, output_dim=512, explain_model=False):
         super().__init__()
         self.explain_model = explain_model
@@ -49,6 +69,17 @@ class BertFeatureExtractor(nn.Module):
 
 
 class FusionModel(nn.Module):
+    """
+    A multimodal classification model that fuses image and text features.
+
+    Args:
+        latent_dim (int): Dimension of the extracted feature vector.
+        num_classes (int): Number of output classes for classification.
+        explain_model (bool): If True, allows gradients for feature extraction.
+
+    Returns:
+        A tensor of shape [batch_size, num_classes] containing class logits.
+    """
     def __init__(self, latent_dim=512, num_classes=2, explain_model=False):
         super().__init__()
 

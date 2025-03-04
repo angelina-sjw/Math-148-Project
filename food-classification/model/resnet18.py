@@ -3,6 +3,17 @@ import torchvision.models as models
 
 
 class Resnet18FineTuneModel(nn.Module):
+    """
+    Fine-tuned ResNet18 model for classification.
+
+    Args:
+        num_classes (int): Number of output classes.
+        dropout_rate (float): Dropout probability in the classifier head.
+        unfreeze_layers (tuple): Layers to unfreeze for fine-tuning.
+
+    Attributes:
+        base (nn.Module): Pretrained ResNet18 model with modified classifier.
+    """
     def __init__(self, num_classes, dropout_rate=0.5, unfreeze_layers=("layer4", "fc")):
         super().__init__()
         
