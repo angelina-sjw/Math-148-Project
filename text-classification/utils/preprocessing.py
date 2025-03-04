@@ -25,17 +25,35 @@ def transform_numeric_features(X_train: pd.DataFrame,
     """
     Apply log transformation and scaling to skewed features and standard scaling
     to other numeric features.
+    
+    Before applying the log transformation, this function shifts any skewed feature
+    with negative values so that the minimum becomes 0. This ensures that np.log1p
+    does not encounter values less than -1.
     """
+    # Shift skewed features if they contain negative values.
+    for feature in skewed_features:
+        min_val = X_train[feature].min()
+        if min_val < 0:
+            shift_value = -min_val  # This will shift the minimum to 0.
+            print(f"Shifting {feature} by {shift_value} to avoid negative values.")
+            X_train[feature] = X_train[feature] + shift_value+1
+            X_test[feature] = X_test[feature] + shift_value+1
+
+    # Define the pipeline for skewed features.
     skewed_pipeline = Pipeline([
         ("log_transform", FunctionTransformer(np.log1p, validate=True)),
         ("scaler", StandardScaler())
     ])
+    
+    # Ensure the data types are float64.
     X_train[skewed_features] = X_train[skewed_features].astype(np.float64)
     X_test[skewed_features] = X_test[skewed_features].astype(np.float64)
 
+    # Apply the skewed pipeline.
     X_train.loc[:, skewed_features] = skewed_pipeline.fit_transform(X_train[skewed_features])
     X_test.loc[:, skewed_features] = skewed_pipeline.transform(X_test[skewed_features])
     
+    # Process other numeric features.
     other_numeric = numeric_features + stars_feature
     numeric_pipeline = Pipeline([("scaler", StandardScaler())])
     X_train[other_numeric] = X_train[other_numeric].astype(np.float64)

@@ -150,7 +150,6 @@ def comprehensive_evaluation(model,
     Comprehensive evaluation of a model.
 
     For scikit-learn based models (model_type='sklearn'):
-      - Plots a learning curve using the given scoring metric.
       - Prints train and test classification reports.
       - Plots confusion matrix, ROC, and precision–recall curves.
       - Plots feature importances if available.
@@ -185,29 +184,29 @@ def comprehensive_evaluation(model,
 
     # Handle scikit-learn models
     if model_type == 'sklearn':
-        # ---- Learning Curve ----
-        try:
-            from sklearn.model_selection import learning_curve
-            print("Plotting learning curve...")
-            # Compute learning curve for training vs. validation performance.
-            train_sizes, train_scores, test_scores = learning_curve(
-                model, X_train_ready, y_train, cv=cv, scoring=scoring, n_jobs=n_jobs
-            )
-            train_scores_mean = np.mean(train_scores, axis=1)
-            test_scores_mean = np.mean(test_scores, axis=1)
+        # # ---- Learning Curve ----
+        # try:
+        #     from sklearn.model_selection import learning_curve
+        #     print("Plotting learning curve...")
+        #     # Compute learning curve for training vs. validation performance.
+        #     train_sizes, train_scores, test_scores = learning_curve(
+        #         model, X_train_ready, y_train, cv=cv, scoring=scoring, n_jobs=n_jobs
+        #     )
+        #     train_scores_mean = np.mean(train_scores, axis=1)
+        #     test_scores_mean = np.mean(test_scores, axis=1)
             
-            # Plot the average training and validation scores across different train sizes.
-            plt.figure(figsize=(8, 6))
-            plt.plot(train_sizes, train_scores_mean, 'o-', label="Training score")
-            plt.plot(train_sizes, test_scores_mean, 'o-', label="Cross-validation score")
-            plt.xlabel("Training Examples")
-            plt.ylabel(scoring)
-            plt.title("Learning Curve")
-            plt.legend(loc="best")
-            plt.tight_layout()
-            plt.show()
-        except Exception as e:
-            print("Learning curve plotting failed:", e)
+        #     # Plot the average training and validation scores across different train sizes.
+        #     plt.figure(figsize=(8, 6))
+        #     plt.plot(train_sizes, train_scores_mean, 'o-', label="Training score")
+        #     plt.plot(train_sizes, test_scores_mean, 'o-', label="Cross-validation score")
+        #     plt.xlabel("Training Examples")
+        #     plt.ylabel(scoring)
+        #     plt.title("Learning Curve")
+        #     plt.legend(loc="best")
+        #     plt.tight_layout()
+        #     plt.show()
+        # except Exception as e:
+        #     print("Learning curve plotting failed:", e)
         
         # ---- Classification Reports (Train and Test) ----
         print("\nEvaluating on training data:")
@@ -292,7 +291,7 @@ def comprehensive_evaluation(model,
         else:
             print("No feature importance attribute found for this model.")
         
-        # ---- LIME Explanation for 10 Test Instances ----
+        # ---- LIME Explanation for 5 Test Instances ----
         try:
             # Create LIME explainer using the training data.
             lime_explainer = lime.lime_tabular.LimeTabularExplainer(
@@ -303,13 +302,13 @@ def comprehensive_evaluation(model,
             )
             
             print("=" * 80)
-            print("LIME Explanations for 10 Test Instances")
+            print("LIME Explanations for 5 Test Instances")
             print("=" * 80)
             
             aggregated_results = []
             
-            # Analyze and store explanations for 10 instances of the test set, starting at sample_index_for_lime.
-            for i in range(sample_index_for_lime, sample_index_for_lime + 10):
+            # Analyze and store explanations for 5 instances of the test set, starting at sample_index_for_lime.
+            for i in range(sample_index_for_lime, sample_index_for_lime + 5):
                 # Retrieve instance from the test data.
                 if hasattr(X_test_ready, "iloc"):
                     instance = X_test_ready.iloc[i]
@@ -341,7 +340,7 @@ def comprehensive_evaluation(model,
                     "LIME Explanation": exp_df
                 })
             
-            # Display the results for each of the 10 instances, including the original text and top features.
+            # Display the results for each of the 5 instances, including the original text and top features.
             for res in aggregated_results:
                 print("\n" + "-" * 80)
                 print(f"Instance {res['Instance']} - Predicted Class: {res['Predicted Class']}")
