@@ -93,6 +93,8 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 ### Text Search
 
+Make sure docker container `yelp-project` and clip server are running before running the following commands.
+
 Simple text search:
 
 ```bash
@@ -127,4 +129,10 @@ The system can be enhanced with a fine-tuned CLIP model on domain-specific data:
 ```bash
 cd rec-engine/clip-server
 python train.py --data_path path/to/your/training/data
+```
+
+### Evaluation
+
+```bash
+python -m tests.evaluation --openai_api_key your-openai-api-key-here
 ```

@@ -34,7 +34,6 @@ class ESClient:
                     "photo_ids": {"type": "keyword"},
                     "captions": {"type": "text"},
                     "labels": {"type": "keyword"},
-                    # Dynamic fields for embeddings with numeric suffixes
                     "text_embedding_*": {
                         "type": "dense_vector",
                         "dims": 1536,
@@ -82,7 +81,6 @@ class ESClient:
             }
         }
         
-        # Create the index with the mapping
         self.es_client.indices.create(index=index, body=mapping)
     
     def delete_index(self, index: str):
@@ -129,7 +127,7 @@ class ESClient:
         response = self.es_client.get(index=index, id=restaurant_id)
         return Restaurant(**response["_source"])
     
-    async def search_restaurants(self, index: str, query: str, k: int = 10, llm_client=None, keywords=None) -> List[Result]:
+    async def search_restaurants(self, index: str, query: str, k: int = 10, llm_client=None, keywords=None, cross_modal= False) -> List[Result]:
         """
         Search for restaurants using either text query or path to a photo.
         
@@ -182,10 +180,135 @@ class ESClient:
         logging.info(f"Using query type: {query_type}")
         
         # Search using the generated embedding
-        results = self.pull_similar_restaurants(index, query_type, embedding, k, keywords)
+        if cross_modal:
+            results = self.pull_similar_restaurants_cross(index, query_type, embedding, k, keywords)
+        else:
+            results = self.pull_similar_restaurants(index, query_type, embedding, k, keywords)
         logging.info(f"Found {len(results)} results")
         
         return results
+    
+    def pull_similar_restaurants_cross(self, index: str, type: str, embedding: List[float], k: int = 10, keywords: Dict[str, Any] = None) -> List[Result]:
+
+        print(f"Performing cross-modal search with {type} input")
+        if keywords:
+            print(f"Filtering with keywords: {keywords}")
+        
+        script_source = """
+        double max_score = 0;
+        boolean found_embedding = false;
+        
+        // Search through text embeddings
+        for (int i = 0; i < 10; i++) {
+            String text_field = 'text_embedding_' + i;
+            if (doc.containsKey(text_field)) {
+                found_embedding = true;
+                double score = cosineSimilarity(params.query_vector, text_field) + 1.0;
+                if (score > max_score) {
+                    max_score = score;
+                }
+            }
+        }
+        
+        // Search through photo embeddings
+        for (int i = 0; i < 50; i++) {
+            String photo_field = 'photo_embedding_' + i;
+            if (doc.containsKey(photo_field)) {
+                found_embedding = true;
+                double score = cosineSimilarity(params.query_vector, photo_field) + 1.0;
+                if (score > max_score) {
+                    max_score = score;
+                }
+            }
+        }
+        
+        // Return 0 if no embeddings were found
+        return found_embedding ? max_score : 0;
+        """
+        
+        if keywords and isinstance(keywords, dict):
+            query = {
+                "bool": {
+                    "must": [
+                        {
+                            "script_score": {
+                                "query": {"match_all": {}},
+                                "script": {
+                                    "source": script_source,
+                                    "params": {"query_vector": embedding}
+                                }
+                            }
+                        }
+                    ],
+                    "filter": []
+                }
+            }
+            
+            if "cuisine" in keywords and keywords["cuisine"] != "None":
+                cuisine_filter = {
+                    "match": {
+                        "cuisine": keywords["cuisine"]
+                    }
+                }
+                query["bool"]["filter"].append(cuisine_filter)
+                
+            if "price_range" in keywords and keywords["price_range"] != "None":
+                price_filter = {
+                    "term": {
+                        "price_range": keywords["price_range"]
+                    }
+                }
+                query["bool"]["filter"].append(price_filter)
+                
+            if "rating" in keywords and keywords["rating"] != -1:
+                rating_filter = {
+                    "range": {
+                        "rating": {
+                            "gte": keywords["rating"]
+                        }
+                    }
+                }
+                query["bool"]["filter"].append(rating_filter)
+        else:
+            query = {
+                "script_score": {
+                    "query": {"match_all": {}},
+                    "script": {
+                        "source": script_source,
+                        "params": {"query_vector": embedding}
+                    }
+                }
+            }
+        
+        try:
+            print(f"Executing cross-modal Elasticsearch query with {len(embedding)} dimensional vector")
+            response = self.es_client.search(
+                index=index,
+                body={
+                    "query": query,
+                    "size": k
+                }
+            )
+            
+            print(f"Elasticsearch response received with {len(response['hits']['hits'])} hits")
+            
+            results = [
+                Result(
+                    restaurant=Restaurant(**hit["_source"]),
+                    score=hit["_score"],
+                )
+                for hit in response["hits"]["hits"]
+                if hit["_score"] > 0
+            ]
+            
+            print(f"After filtering, {len(results)} results remain")
+            return results
+            
+        except Exception as e:
+            print(f"Error in Elasticsearch query: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return []
 
     def pull_similar_restaurants(self, index: str, type: str, embedding: List[float], k: int = 10, keywords: Dict[str, Any] = None) -> List[Result]:
         embedding_field_prefix = 'text_embedding_' if type == 'text' else 'photo_embedding_'
@@ -232,7 +355,7 @@ class ESClient:
                 }
             }
             
-            if "cuisine" in keywords:
+            if "cuisine" in keywords and keywords["cuisine"] != "None":
                 cuisine_filter = {
                     "match": {
                         "cuisine": keywords["cuisine"]
@@ -240,8 +363,7 @@ class ESClient:
                 }
                 query["bool"]["filter"].append(cuisine_filter)
                 
-            if "price_range" in keywords:
-                # For price range (assuming it's stored as a string or number)
+            if "price_range" in keywords and keywords["price_range"] != "None":
                 price_filter = {
                     "term": {
                         "price_range": keywords["price_range"]
@@ -249,8 +371,7 @@ class ESClient:
                 }
                 query["bool"]["filter"].append(price_filter)
                 
-            if "rating" in keywords:
-                # For rating, use a range query to find restaurants with at least the specified rating
+            if "rating" in keywords and keywords["rating"] != -1:
                 rating_filter = {
                     "range": {
                         "rating": {
@@ -282,7 +403,6 @@ class ESClient:
             
             print(f"Elasticsearch response received with {len(response['hits']['hits'])} hits")
             
-            # Filter out results with zero score (no matching embeddings)
             results = [
                 Result(
                     restaurant=Restaurant(**hit["_source"]),
