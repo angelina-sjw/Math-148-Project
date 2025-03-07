@@ -79,9 +79,48 @@ The **food-classification** module contains code for processing and analyzing re
   - Predict pricing tiers (“Cheap” vs. “Expensive”) based on image features.
   - Compare single-modal (image-only) and multimodal approaches (combining image features with text summaries).
 
+- **Model Explainability**
+  - Visualize high to low confidence photo classification.
+  - Apply Grad-CAM to highlight important image regions influencing classification decisions.
+
 ### Setup & Execution
 
-_[Specific setup instructions for image analysis codes will be added here later.]_
+#### Prerequisites
+
+- Python 3.10+
+- Poetry (for dependency management)
+- GPU for training
+  
+#### Installation Steps
+
+1. **Clone the Repository:**
+   ```bash
+   git clone https://github.com/angelina-sjw/Math-148-Project.git
+   cd Math-148-Project
+   cd food-classification
+   ```
+
+2. **Install Dependencies and Activate Virtual Environment:**
+   ```bash
+   poetry install
+   poetry shell
+   ```
+   
+3. **Prepare the Yelp Dataset:**  
+   Visit [Yelp Open Dataset](https://business.yelp.com/data/resources/open-dataset/) and download the necessary JSON files.
+   Place the downloaded dataset under a new `data` directory inside the `food-classification` folder.
+   Resize the yelp photos into 224x224 using the `resize_images` function in `data_utils.utils`.
+
+4. **Model Finetuning**
+   The `notebooks` directory contains three subdirectories: `label`, `price`, and `food101`, each corresponding to a different classification task. Each subdirectory includes training notebooks prefixed with `train_`, which are used to finetune the models.
+
+5. **Model Explainability**  
+   The `explainability` subdirectory contains notebooks for applying Grad-CAM, visualizing predictions, and performing exploratory image data analysis.
+
+6. **Additional Code & Utilities**  
+   - All trained models, including the fusion model, ResNet fine-tuning, and Grad-CAM, are stored in the `model` directory.  
+   - The PyTorch dataset class and helper functions, such as `stratified_split_dataset`, are located in `data_utils/dataset`.  
+   - Data-related utility functions are in `data_utils/utils`, while modeling-related helper functions are in `model/utils`.   
 
 ---
 
