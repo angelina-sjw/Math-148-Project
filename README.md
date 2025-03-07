@@ -1,166 +1,212 @@
-# Yelp Data Processing and Analysis Pipeline
+# Math 148 Project – Yelp Review Usefulness Prediction and Restaurant Image Analysis
 
-This repository contains a complete end-to-end pipeline for processing, cleaning, transforming, and analyzing Yelp review data. The project is organized into multiple modules that load and clean data, reduce dimensions, impute missing values, extract text features, build machine learning models, and visualize results. It is designed to facilitate exploration of review usefulness and supports a classification task that categorizes reviews into "less useful" or "more useful" (with "average" reviews filtered out).
+This repository contains the code and experiments for our project, which leverages Yelp’s multimodal data to predict review usefulness and analyze restaurant images. The project is divided into three main components:
 
----
-
-## Table of Contents
-
-- [Overview](#overview)
-- [Project Structure](#project-structure)
-- [Installation and Dependencies](#installation-and-dependencies)
-- [Data Preprocessing Pipeline](#data-preprocessing-pipeline)
-- [Usage Instructions](#usage-instructions)
-- [Code Overview](#code-overview)
+1. **Text Analysis**  
+2. **Image Analysis**  
+3. **Multimodal Recommendation System**
 
 ---
 
-## Overview
+## 1. Text Analysis
 
-This project processes raw Yelp JSON datasets by:
-- Loading the JSON files into a SQLite database.
-- Merging and filtering review, user, and business data.
-- Performing dimensionality reduction by aggregating columns (e.g., summing votes, compliments, and transforming categorical attributes).
-- Imputing missing values in binary columns using a K-Nearest Neighbors (KNN) approach.
-- Extracting numeric and text features, including sentiment, SBERT embeddings (with PCA reduction), LDA topics, and TF-IDF features.
-- Creating preprocessing pipelines for numeric and categorical features.
-- Training a Random Forest classifier with SMOTE for class balancing and evaluating its performance using classification metrics and confusion matrices.
+The **text-analysis** module processes Yelp review data to predict whether a review will be perceived as "more useful" or "less useful." It employs a range of natural language processing techniques and machine learning models to extract actionable insights from textual reviews.
 
----
+### Overview
 
-## Project Structure
-
-- **data_utils.py**:  
-  Contains functions to load CSV data, drop unnecessary columns, convert binary columns to numeric categorical codes, and transform numeric features using pipelines (e.g., log-transformation and scaling).
-
-- **dim_reduction.py**:  
-  Processes large CSV files in chunks, performs column merging and transformation (e.g., summing vote and compliment columns, mapping price and attire attributes), converts key numeric columns, and outputs a dimension-reduced CSV file.
-
-- **imputation_utils.py**:  
-  Implements a KNN-based imputation strategy to fill in missing values in specified binary columns. It uses stratified cross-validation to assess imputation quality.
-
-- **load_data.py**:  
-  Loads Yelp JSON files for reviews, users, and businesses into a SQLite database. It creates necessary tables, extracts and transforms relevant columns, processes parking and ambience attributes, merges income data by ZIP code, and outputs a filtered CSV dataset.
-
-- **modeling_utils.py**:  
-  Provides functions to build a preprocessing pipeline (combining imputation, scaling, and one-hot encoding) and run classification using a Random Forest classifier with SMOTE for handling class imbalance.
-
-- **plotting_utils.py**:  
-  Contains functions to visualize numeric distributions (histograms), categorical distributions (bar charts), target variable distribution, and confusion matrices.
-
-- **processing.py**:  
-  Offers helper functions to parse dictionary-like columns (e.g., for parking and ambience attributes) and expand these into separate boolean features.
-
-- **text_transformer_utils.py**:  
-  Defines a custom transformer (`TextTransformer`) that:
-  - Computes sentiment scores using TextBlob.
-  - Generates SBERT embeddings and reduces their dimensions via PCA.
-  - Extracts topics using Latent Dirichlet Allocation (LDA) from bag-of-words representations.
-  - Creates TF-IDF features.
+- **Data Download & Preparation:**  
+  - **Download Data:** Obtain the Yelp Open Dataset from [Yelp Open Dataset](https://business.yelp.com/data/resources/open-dataset/).  
+  - **Preprocessing:** Use the script in `utils/loading.py` to convert raw JSON files into a cleaned CSV format. This script also handles linking reviews with business and user profiles.
   
-  The original text column is dropped after feature extraction.
+- **Feature Extraction:**  
+  - **Sentiment Analysis:** Compute sentiment polarity using TextBlob.
+  - **Topic Modeling:** Use BERTopic to extract semantic topics from reviews.
+  - **TF-IDF Vectorization:** Generate weighted features capturing the importance of unigrams and bigrams.
 
-- **zipcode.py**:  
-  Downloads and merges US household income data (from Kaggle) by ZIP code with the Yelp dataset to incorporate regional income features.
+- **Modeling:**  
+  - **Baseline Models:**  
+    - *Logistic Regression* on structured numerical data.
+  - **Text-Only Models:**  
+    - Fine-tuned BERT model.
+    - Custom LSTM network.
+  - **Integrated Multi-Input Model:**  
+    - Combines text embeddings (via an LSTM branch) and numerical features (via dense layers) for enhanced prediction.
+    - Uses SMOTE for handling class imbalance.
+    - Optimized using binary cross-entropy loss and the Adam optimizer.
 
-- **main.ipynb**:  
-  A Jupyter Notebook that ties everything together for initial exploration:
-  - Loads the preprocessed CSV.
-  - Splits the data into training and testing sets.
-  - Performs imputation on binary columns.
-  - Plots numeric and categorical feature distributions.
-  - Transforms numeric and text features.
-  - Prepares the final preprocessed data using a `ColumnTransformer`.
-  - Trains a Random Forest classifier (with SMOTE for balancing) and evaluates model performance, including plotting the confusion matrix.
+### Setup & Execution
+
+#### Prerequisites
+
+- Python 3.8+
+- HuggingFace API Token (for access to BERT and BERTopic)
+
+#### Installation & Running
+
+1. **Download the Yelp Dataset:**  
+   Visit [Yelp Open Dataset](https://business.yelp.com/data/resources/open-dataset/) and download the necessary JSON files.
+
+2. **Prepare the Data:**  
+   Navigate to the `text-analysis` folder and run:
+   ```bash
+   python utils/loading.py
+   ```
+
+This will process the raw JSON data into a CSV file ready for analysis.
+
+3. **Run the Main Notebook:**  
+   Open the main notebook (located in the `text-analysis` folder) to:
+   - Import helper functions from the `utils` folder.
+   - Train and evaluate various models (baseline, BERT, LSTM, and the multi-input neural network).
+   - Visualize metrics such as ROC-AUC, Precision-Recall, and model interpretability using LIME.
 
 ---
 
-## Installation and Dependencies
+## 2. Image Analysis
 
-Ensure you have Python 3.7 or later installed. The following Python packages are required:
+The **food-classification** module contains code for processing and analyzing restaurant images. This part of the project focuses on two main tasks: image classification and price prediction using restaurant photos.
 
-- pandas
-- numpy
-- scikit-learn
-- imblearn
-- matplotlib
-- seaborn
-- sentence_transformers
-- textblob
-- sqlite3 (standard library)
-- kagglehub (for downloading the income dataset)
-- ast (standard library)
+### Overview
 
-You can install most dependencies using pip:
+- **Label Classification:**  
+  - Classify images into predefined categories (food, drink, interior, exterior, menu) using a modified ResNet-18.
+  
+- **Food Classification:**  
+  - Fine-tune an EfficientNet-B0 model on the Food101 dataset to assign pseudo-labels to Yelp food images.
+  
+- **Price Prediction:**  
+  - Predict pricing tiers (“Cheap” vs. “Expensive”) based on image features.
+  - Compare single-modal (image-only) and multimodal approaches (combining image features with text summaries).
 
+### Setup & Execution
+
+_[Specific setup instructions for image analysis codes will be added here later.]_
+
+---
+
+## 3. Multimodal Recommendation System
+
+The **rec-engine** module implements a multimodal search engine for Yelp restaurants by integrating textual and visual data.
+
+### Overview
+
+The recommendation engine combines:
+- **Vector Database:** Elasticsearch stores and retrieves restaurant embeddings.
+- **Large Language Models:** OpenAI’s GPT (or similar) models are used for keyword extraction and understanding natural language queries.
+- **CLIP-ViT:** Bridges text and image modalities by generating shared embeddings for both.
+
+This system allows users to search for restaurants using:
+- **Text Queries:** Find restaurants based on natural language descriptions.
+- **Image Queries:** Upload an image to retrieve visually similar restaurants.
+- **Advanced Filtering:** Use AI-extracted keywords to filter results by cuisine, price range, and rating.
+
+### Getting Started
+
+#### Prerequisites
+
+- Python 3.8+
+- Poetry (for dependency management)
+- Elasticsearch (local or remote instance; Docker is recommended)
+- OpenAI API key (for LLM functionality)
+- CUDA-compatible GPU (recommended for running the CLIP model server)
+- Docker (for Elasticsearch setup)
+
+#### Installation Steps
+
+1. **Clone the Repository:**
+   ```bash
+   git clone https://github.com/angelina-sjw/Math-148-Project.git
+   cd Math-148-Project
+   ```
+
+2. **Install Dependencies for Main Application:**
+   ```bash
+   poetry install
+   ```
+
+3. **Setup the CLIP Model Server:**
+   ```bash
+   cd rec-engine/clip-server
+   poetry install
+   ```
+
+4. **Add Yelp Dataset Files:**
+   In the `rec-engine` folder, create a `data` directory and add the following:
+   - `photos/` (folder containing business photos)
+   - `photos.json`
+   - `yelp_academic_dataset_business.json`
+
+5. **Launch Elasticsearch with Docker:**
+   ```bash
+   cd rec-engine/docker
+   docker-compose up -d
+   ```
+6. **Load Data into Elasticsearch:**
+   ```bash
+   python -m rec-engine.app.load_data --openai_api_key YOUR_OPENAI_API_KEY
+   ```
+### Usage
+
+#### Starting the CLIP Server
+
+Start the embedding server:
+   ```bash
+   cd rec-engine/clip-server
+   uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+   ```
+
+#### Text Search
+
+Make sure both the Elasticsearch container and the CLIP server are running, then execute:
+   ```bash
+   python -m rec-engine.app.main --query "romantic Italian restaurant for dinner" --openai_api_key YOUR_OPENAI_API_KEY
+   ```
+
+For advanced text search with keyword extraction:
+   ```bash
+   python -m rec-engine.app.main --query "romantic Italian restaurant for dinner" --openai_api_key YOUR_OPENAI_API_KEY --advanced_mode ```
+   ```
+
+#### Image Search
+
+1. Place Your Query Image:  
+   Put your image in rec-engine/rec_engine/app/image_query/ (e.g., your-food-image.jpg).
+
+2. Run the Image Search:
+   ```bash
+   python -m rec-engine.app.main --query "rec-engine/rec_engine/app/image_query/your-food-image.jpg" --openai_api_key YOUR_OPENAI_API_KEY
+   ```
+*Tip:* Use quotes around file paths that contain spaces.
+
+#### Fine-Tuning the CLIP Model
+
+To fine-tune the CLIP model on the Yelp dataset:
 ```bash
-pip install pandas numpy scikit-learn imbalanced-learn matplotlib seaborn sentence_transformers textblob kagglehub
+cd rec-engine/clip-server
+python train.py --data_path PATH_TO_YOUR_TRAINING_DATA
 ```
 
-Additional setup (e.g., for Kaggle API credentials) may be necessary to download datasets.
+#### Evaluation
+
+Run evaluation scripts to assess system performance:
+```bash
+python -m tests.evaluation --openai_api_key YOUR_OPENAI_API_KEY
+```
 
 ---
 
-## Data Preprocessing Pipeline
+## Contributing
 
-1. **Loading and Cleaning Data**:  
-   Run `load_data.py` to:
-   - Create and populate SQLite tables from Yelp JSON files.
-   - Merge review, user, and business data.
-   - Process parking/ambience categories and merge income data.
-   - Filter reviews based on review counts and usefulness.
-   - Save the filtered merged dataset as `yelp_merged_data_filtered.csv`.
-
-2. **Dimension Reduction**:  
-   Run `dim_reduction.py` to:
-   - Process the large filtered CSV in chunks.
-   - Merge/transform columns (e.g., summing votes, compliments, parking, ambience).
-   - Map price and attire categories.
-   - Output a reduced-dimension CSV file (`yelp_reduced.csv`).
-
-3. **Exploratory Analysis and Modeling**:  
-   Open and run the `main.ipynb` notebook:
-   - Load the reduced CSV.
-   - Split the data into training and testing sets.
-   - Perform imputation on binary columns.
-   - Visualize distributions of numeric and categorical features.
-   - Transform numeric features (e.g., log transformations and scaling).
-   - Extract text features (sentiment, SBERT-PCA, LDA topics, TF-IDF).
-   - Preprocess final features using a `ColumnTransformer`.
-   - Train a Random Forest classifier (with SMOTE for balancing) and evaluate model performance.
+Contributions, suggestions, and bug reports are welcome. Please open an issue or submit a pull request.
 
 ---
 
-## Usage Instructions
+## Acknowledgements
 
-1. **Prepare the Data:**
-   - First, run `load_data.py` to load raw Yelp JSON files into SQLite and output the merged CSV.
-   - Then, run `dim_reduction.py` to reduce data dimensions and produce the `yelp_reduced.csv` file.
-
-2. **Explore and Model:**
-   - Open `main.ipynb` in Jupyter Notebook.
-   - Follow the notebook cells to load data, perform train-test splits, impute missing values, visualize data, transform features, build preprocessing pipelines, and run the classification model.
-
-3. **Visualization and Evaluation:**
-   - Use the provided plotting functions to explore feature distributions.
-   - Review the classification report and confusion matrix generated from the model evaluation.
+- Special thanks to our professor, Lara Kassab, and TAs Joyce Chew and Chi-Hao Wu for their invaluable guidance.
+- We appreciate all the team members who contributed to the success of this project.
 
 ---
 
-## Code Overview
+For more details, please feel free to explore the code in each folder.
 
-Each module in the project plays a key role in the pipeline:
-
-- **Data Loading & Cleaning**:  
-  `data_utils.py` and `load_data.py` manage reading and cleaning data from CSV and JSON formats.
-  
-- **Dimension Reduction & Feature Engineering**:  
-  `dim_reduction.py`, `processing.py`, and `zipcode.py` focus on reducing the data size and creating new features through column aggregation and external income data merging.
-
-- **Imputation & Transformation**:  
-  `imputation_utils.py` handles missing binary values via KNN, while `text_transformer_utils.py` extracts rich text features.
-
-- **Modeling & Visualization**:  
-  `modeling_utils.py` builds the ML model pipeline and applies SMOTE, and `plotting_utils.py` provides various plotting utilities for exploratory data analysis.
-
----
