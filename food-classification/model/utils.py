@@ -277,13 +277,13 @@ def get_device():
     return device
 
 
-def evaluate_on_test(model, test_loader, device, class_names):
+def evaluate_model(model, loader, device, class_names):
     """
     Evaluates the model on the test dataset and prints a classification report.
 
     Args:
         model (nn.Module): The trained model.
-        test_loader (DataLoader): DataLoader for test data.
+        loader (DataLoader): DataLoader for data.
         device (torch.device): Device (CPU/GPU) for evaluation.
         class_names (list): List of class names.
 
@@ -296,7 +296,7 @@ def evaluate_on_test(model, test_loader, device, class_names):
     all_targets = []
     
     with torch.no_grad():
-        for images, labels in test_loader:
+        for images, labels in loader:
             images = images.to(device)
             labels = labels.to(device)
             
@@ -306,17 +306,17 @@ def evaluate_on_test(model, test_loader, device, class_names):
             all_preds.extend(predicted.cpu().numpy())
             all_targets.extend(labels.cpu().numpy())
     
-    print("Classification Report on Test Set:")
+    print("Classification Report:")
     print(classification_report(all_targets, all_preds, target_names=class_names))
 
 
-def evaluate_on_test_multimodal(model, test_loader, device, class_names):
+def evaluate_model_multimodal(model, loader, device, class_names):
     """
     Evaluates a multimodal model (image + text) on the test dataset and prints a classification report.
 
     Args:
         model (nn.Module): The trained multimodal model.
-        test_loader (DataLoader): DataLoader for test data.
+        loader (DataLoader): DataLoader for data.
         device (torch.device): Device (CPU/GPU) for evaluation.
         class_names (list): List of class names.
 
@@ -329,7 +329,7 @@ def evaluate_on_test_multimodal(model, test_loader, device, class_names):
     all_targets = []
     
     with torch.no_grad():
-        for batch in test_loader:
+        for batch in loader:
             images = batch['image'].to(device)
             input_ids = batch['input_ids'].to(device)
             attention_masks = batch['attention_mask'].to(device)
@@ -340,7 +340,46 @@ def evaluate_on_test_multimodal(model, test_loader, device, class_names):
             
             all_preds.extend(predicted.cpu().numpy())
             all_targets.extend(labels.cpu().numpy())
-    print("Classification Report on Test Set:")
+    print("Classification Report:")
+    print(classification_report(all_targets, all_preds, target_names=class_names))
+
+
+def evaluate_model_with_top_k(model, loader, device, class_names, test=True):
+    model.eval()
+
+    top1_correct = 0
+    top5_correct = 0
+    total_samples = 0
+
+    all_preds = []
+    all_targets = []
+
+    with torch.no_grad():
+        for images, labels in loader:
+            images = images.to(device)
+            labels = labels.to(device)
+            
+            outputs = model(images)
+            
+            _, predicted = torch.max(outputs, 1)
+
+            top5_preds = torch.topk(outputs, k=5, dim=1).indices
+            top5_correct += torch.sum(top5_preds.eq(labels.view(-1, 1)).any(dim=1)).item()
+
+            top1_correct += (predicted == labels).sum().item()
+
+            all_preds.extend(predicted.cpu().numpy())
+            all_targets.extend(labels.cpu().numpy())
+
+            total_samples += labels.size(0)
+
+    top1_accuracy = top1_correct / total_samples
+    top5_accuracy = top5_correct / total_samples
+
+    print(f"Top-1 Accuracy: {top1_accuracy:.4f}")
+    print(f"Top-5 Accuracy: {top5_accuracy:.4f}")
+
+    print("Classification Report:")
     print(classification_report(all_targets, all_preds, target_names=class_names))
 
 

@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
 
-from data_utils.utils import preprocess_image
+from data_utils.utils import preprocess_image, unnormalize_image
 
 
 class GradCAM():
@@ -127,4 +127,65 @@ def display_grad_cam(model, device, photo_ids, photo_dir, num_images=5):
         ax.set_title(f"{photo_id}")
         ax.axis("off")
 
+    plt.show()
+
+
+def display_target_image_grad_cam(model, device, image_tensor):
+    """
+    Applies Grad-CAM to the given input tensor using the specified model.
+
+    Args:
+        model (nn.Module): The trained model.
+        device (torch.device): Device to run inference on (CPU/GPU).
+        input_tensor (torch.Tensor): Preprocessed input image tensor (batch size can be 1 or more).
+
+    Returns:
+        np.ndarray: The Grad-CAM heatmap (2D) for the input tensor.
+    """
+    # Make sure model is in eval mode
+    model.eval()
+    
+    # Send the tensor to the correct device
+    input_tensor = input_tensor.to(device)
+
+    # Select the layer you want Grad-CAM to target
+    target_layer = model.base.layer4[1]
+    
+    # Initialize your GradCAM object
+    gradcam = GradCAM(model, target_layer)
+    
+    # Generate the Grad-CAM heatmap
+    cam = gradcam.generate_cam(input_tensor)
+    
+    return cam
+
+
+def display_target_image_grad_cam(model, device, input_tensor):
+    """
+    Applies Grad-CAM to the given input tensor using the specified model.
+
+    Args:
+        model (nn.Module): The trained model.
+        device (torch.device): Device to run inference on (CPU/GPU).
+        input_tensor (torch.Tensor): Preprocessed input image tensor (batch size can be 1 or more).
+
+    Returns:
+        np.ndarray: The Grad-CAM heatmap (2D) for the input tensor.
+    """
+    # Make sure model is in eval mode
+    model.eval()
+    input_tensor = input_tensor.unsqueeze(0).to(device)
+
+    target_layer = model.base.layer4[1]
+
+    gradcam = GradCAM(model, target_layer)
+
+    cam = gradcam.generate_cam(input_tensor)
+
+    unnorm_image = unnormalize_image(input_tensor)
+
+    overlay_image = gradcam.overlay_heatmap(unnorm_image, cam)
+    plt.figure(figsize=(6, 6))
+    plt.imshow(overlay_image)
+    plt.axis("off")
     plt.show()
