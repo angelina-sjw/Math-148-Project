@@ -1,5 +1,6 @@
 import os
 
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
@@ -176,3 +177,40 @@ def show_images(samples, title):
         ax.axis("off")
     plt.suptitle(title)
     plt.show()
+
+
+def display_pseudolabels_based_on_confidence(df, min_conf, max_conf, image_dir, num_samples=5):
+    filtered_df = df[(df["food101_confidences"] >= min_conf) & (df["food101_confidences"] <= max_conf)]
+    sampled_df = filtered_df.sample(n=min(num_samples, len(filtered_df)))
+    fig, axes = plt.subplots(1, len(sampled_df), figsize=(len(sampled_df) * 2, 2))
+
+    if len(sampled_df) == 1:
+        axes = [axes]
+
+    for ax, (_, row) in zip(axes, sampled_df.iterrows()):
+        img_path = os.path.join(image_dir, f"{row['photo_id']}.jpg")
+
+        if os.path.exists(img_path):
+            img = mpimg.imread(img_path)
+            ax.imshow(img)
+            ax.axis('off')
+            ax.set_title(f"{row['food101_predictions_decoded']} {row['food101_confidences']:.2f}", fontsize=10, fontweight='bold')
+        else:
+            ax.axis('off')
+
+    plt.tight_layout()
+    plt.show()
+
+
+def unnormalize_image(tensor):
+    mean = [0.485, 0.456, 0.406]
+    std = [0.229, 0.224, 0.225]
+    if tensor.dim() == 4 and tensor.size(0) == 1:
+        tensor = tensor.squeeze(0)
+    unnorm_tensor = tensor.clone().detach().cpu()
+    for c in range(3):
+        unnorm_tensor[c] = unnorm_tensor[c] * std[c] + mean[c]
+    unnorm_image = unnorm_tensor.permute(1, 2, 0).numpy()
+    unnorm_image = np.clip(unnorm_image, 0, 1) 
+    unnorm_image = (unnorm_image * 255).astype(np.uint8)
+    return unnorm_image
