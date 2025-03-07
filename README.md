@@ -40,6 +40,7 @@ The **text-analysis** module processes Yelp review data to predict whether a rev
 
 - Python 3.8+
 - HuggingFace API Token (for access to BERT and BERTopic)
+- Required Python packages (see `requirements.txt`)
 
 #### Installation & Running
 
