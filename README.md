@@ -107,15 +107,15 @@ The **food-classification** module contains code for processing and analyzing re
    ```
    
 3. **Prepare the Yelp Dataset:**  
-   Visit [Yelp Open Dataset](https://business.yelp.com/data/resources/open-dataset/) and download the necessary JSON files.
-   Place the downloaded dataset under a new `data` directory inside the `food-classification` folder.
+   - Visit [Yelp Open Dataset](https://business.yelp.com/data/resources/open-dataset/) and download the necessary JSON files.
+   - Place the downloaded dataset under a new `data` directory inside the `food-classification` folder.
    Resize the yelp photos into 224x224 using the `resize_images` function in `data_utils.utils`.
 
-4. **Model Finetuning**
-   The `notebooks` directory contains three subdirectories: `label`, `price`, and `food101`, each corresponding to a different classification task. Each subdirectory includes training notebooks prefixed with `train_`, which are used to finetune the models.
+4. **Model Finetuning:**
+   - The `notebooks` directory contains three subdirectories: `label`, `price`, and `food101`, each corresponding to a different classification task. Each subdirectory includes training notebooks prefixed with `train_`, which are used to finetune the models.
 
-5. **Model Explainability**  
-   The `explainability` subdirectory contains notebooks for applying Grad-CAM, visualizing predictions, and performing exploratory image data analysis.
+5. **Model Explainability:**  
+   - The `explainability` subdirectory contains notebooks for applying Grad-CAM, visualizing predictions, and performing exploratory image data analysis.
 
 6. **Additional Code & Utilities**  
    - All trained models, including the fusion model, ResNet fine-tuning, and Grad-CAM, are stored in the `model` directory.  
