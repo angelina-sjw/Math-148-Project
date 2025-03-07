@@ -6,6 +6,8 @@ This repository contains the code and experiments for our project, which leverag
 2. **Image Analysis**  
 3. **Multimodal Recommendation System**
 
+The primary dataset used in this project, the Yelp Open Dataset, can be obtained from [Yelp Open Dataset](https://business.yelp.com/data/resources/open-dataset/).  
+
 ---
 
 ## 1. Text Analysis
@@ -14,9 +16,7 @@ The **text-analysis** module processes Yelp review data to predict whether a rev
 
 ### Overview
 
-- **Data Download & Preparation:**  
-  - **Download Data:** Obtain the Yelp Open Dataset from [Yelp Open Dataset](https://business.yelp.com/data/resources/open-dataset/).  
-  - **Preprocessing:** Use the script in `utils/loading.py` to convert raw JSON files into a cleaned CSV format. This script also handles linking reviews with business and user profiles.
+- **Data Download & Preparation:** Use the script in `utils/loading.py` to convert raw JSON files into a cleaned CSV format. This script also handles linking reviews with business and user profiles.
   
 - **Feature Extraction:**  
   - **Sentiment Analysis:** Compute sentiment polarity using TextBlob.
